@@ -24,6 +24,21 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
 
+        System.out.println("LOGIN DEBUG:");
+        System.out.println("Username: " + username);
+        System.out.println("Stored password: " + user.getPassword());
+        System.out.println("Approved: " + user.isApproved());
+        System.out.println("Deleted: " + user.isDeleted());
+
+        if (!user.isApproved()) {
+            System.out.println("BLOCKED: User not approved");
+            throw new UsernameNotFoundException("User not approved");
+        }
+        if (user.isDeleted()) {
+            System.out.println("BLOCKED: User is deleted");
+            throw new UsernameNotFoundException("User deleted");
+        }
+
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword(),

@@ -38,6 +38,12 @@ public class Employee {
     @Positive(message = "Salary must be positive")
     private Double salary;
 
+    /**
+     * Soft delete flag. If true, the record is logically deleted but remains in the DB.
+     */
+    @Column(nullable = false)
+    private boolean deleted = false;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EmployeeStatus status = EmployeeStatus.PENDING;

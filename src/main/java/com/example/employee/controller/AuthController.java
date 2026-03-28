@@ -11,10 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -23,10 +24,16 @@ public class AuthController {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final com.example.employee.service.AuditLogService auditLogService;
 
-    public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder, 
+                          AuthenticationManager authenticationManager,
+                          com.example.employee.service.AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+        this.auditLogService = auditLogService;
     }
 
     /**
@@ -51,10 +58,17 @@ public class AuthController {
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(request.getRole());
+        
+        // Default role is HR if not specified
+        user.setRole(request.getRole() != null ? request.getRole() : com.example.employee.entity.Role.HR);
+        user.setApproved(false);
+        user.setDeleted(false);
 
         User savedUser = userRepository.save(user);
         
+        // Audit log the registration
+        auditLogService.logAction("REGISTER_HR", user.getUsername());
+
         // Security: Never return the password
         savedUser.setPassword("********");
 
@@ -67,29 +81,53 @@ public class AuthController {
      * Authenticates a user based on username and password.
      *
      * @param request The login credentials.
-     * @return A ResponseEntity with user details if successful.
+     * @return A ResponseEntity indicating successful login.
      */
-    @Operation(summary = "Login a user", description = "Validates credentials and returns user information if successful.")
+    @Operation(summary = "Login a user", description = "Authenticates a user with username and password.")
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<User>> login(@Valid @RequestBody LoginRequest request) {
         log.info("Process: Login. Attempting user: {}", request.getUsername());
 
-        return userRepository.findByUsername(request.getUsername())
-                .map(user -> {
-                    if (passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-                        log.info("Login successful for user: {}", request.getUsername());
-                        user.setPassword("********"); // Hide password
-                        return ResponseEntity.ok(ApiResponse.success("Login successful", user));
-                    } else {
-                        log.warn("Login failed: Invalid password for user '{}'", request.getUsername());
-                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                                .body(new ApiResponse<User>("error", "Invalid username or password", null));
-                    }
-                })
-                .orElseGet(() -> {
-                    log.warn("Login failed: User '{}' not found", request.getUsername());
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                            .body(new ApiResponse<User>("error", "Invalid username or password", null));
-                });
+        // Check for user existence
+        var userOpt = userRepository.findByUsername(request.getUsername());
+        if (userOpt.isEmpty()) {
+            log.warn("Login rejected: User '{}' not found", request.getUsername());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Invalid username or password"));
+        }
+
+        User user = userOpt.get();
+
+        if (user.isDeleted()) {
+            log.warn("Login rejected: Account '{}' is deactivated", request.getUsername());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Account has been deactivated"));
+        }
+        if (!user.isApproved()) {
+            log.warn("Login rejected: Account '{}' is pending approval", request.getUsername());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Account pending admin approval"));
+        }
+
+        try {
+            log.debug("Authenticating user: {}", request.getUsername());
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            // Audit log the login
+            auditLogService.logAction("LOGIN", request.getUsername());
+
+            // Return user details (without password)
+            user.setPassword("********");
+            log.info("Login successful for user: {}", request.getUsername());
+            return ResponseEntity.ok(ApiResponse.success("Login successful", user));
+
+        } catch (Exception e) {
+            log.warn("Login failed for user '{}': {}", request.getUsername(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Invalid username or password"));
+        }
     }
 }

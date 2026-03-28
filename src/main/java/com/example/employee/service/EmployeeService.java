@@ -3,13 +3,16 @@ package com.example.employee.service;
 import com.example.employee.entity.Employee;
 import com.example.employee.entity.EmployeeStatus;
 import com.example.employee.repository.EmployeeRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.example.employee.exception.ResourceNotFoundException;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import com.example.employee.specification.EmployeeSpecification;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -20,8 +23,13 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class EmployeeService {
 
-    @Autowired
-    private EmployeeRepository employeeRepository;
+    private final EmployeeRepository employeeRepository;
+    private final AuditLogService auditLogService;
+
+    public EmployeeService(EmployeeRepository employeeRepository, AuditLogService auditLogService) {
+        this.employeeRepository = employeeRepository;
+        this.auditLogService = auditLogService;
+    }
 
     /**
      * Creates a new employee record in the database.
@@ -31,31 +39,67 @@ public class EmployeeService {
      * @return The saved employee object.
      */
     public Employee createEmployee(Employee employee) {
-        log.info("Creating new employee with email: {}. Initial status: PENDING", employee.getEmail());
-        employee.setStatus(EmployeeStatus.PENDING);
-        return employeeRepository.save(employee);
+        String username = getCurrentUsername();
+        boolean isAdmin = isCurrentUserAdmin();
+        EmployeeStatus initialStatus = isAdmin ? EmployeeStatus.APPROVED : EmployeeStatus.PENDING;
+
+        log.info("Creating new employee by user: {} (isAdmin: {}). Assigned status: {}", 
+                username, isAdmin, initialStatus);
+
+        employee.setStatus(initialStatus);
+        Employee savedEmployee = employeeRepository.save(employee);
+        
+        // Log auditing action
+        auditLogService.logAction("CREATE_EMPLOYEE", username);
+        
+        return savedEmployee;
     }
 
     /**
-     * Retrieves a paginated list of all APPROVED employees.
+     * Retrieves a paginated list of employees based on dynamic filters.
      *
-     * @param pageable Pagination information (page number, size, sort).
+     * @param department Optional department filter.
+     * @param status     Optional status filter (defaults to APPROVED if not specified).
+     * @param minSalary  Optional minimum salary filter.
+     * @param maxSalary  Optional maximum salary filter.
+     * @param pageable   Pagination information.
      * @return A Page of Employee objects.
      */
-    public Page<Employee> getAllEmployees(Pageable pageable) {
-        return employeeRepository.findByStatus(EmployeeStatus.APPROVED, pageable);
+    public Page<Employee> getAllEmployees(String department, EmployeeStatus status, Double minSalary, Double maxSalary, Pageable pageable) {
+        log.info("Fetching employees with filters - Dept: {}, Status: {}, MinSalary: {}, MaxSalary: {}", 
+                department, status, minSalary, maxSalary);
+
+        // Default to APPROVED if no status is specified to maintain legacy behavior
+        EmployeeStatus targetStatus = (status != null) ? status : EmployeeStatus.APPROVED;
+
+        Specification<Employee> spec = Specification.where(EmployeeSpecification.isNotDeleted())
+                .and(EmployeeSpecification.hasDepartment(department))
+                .and(EmployeeSpecification.hasStatus(targetStatus))
+                .and(EmployeeSpecification.hasMinSalary(minSalary))
+                .and(EmployeeSpecification.hasMaxSalary(maxSalary));
+
+        return employeeRepository.findAll(spec, pageable);
     }
 
     /**
-     * Searches for employees by name with pagination.
+     * Searches for employees with multi-criteria filtering.
      *
-     * @param name     The name (or part of the name) to search for.
-     * @param pageable Pagination information.
+     * @param name       Partial match for name.
+     * @param department Optional department filter.
+     * @param status     Optional status filter.
+     * @param pageable   Pagination information.
      * @return A Page of matching Employee objects.
      */
-    public Page<Employee> searchEmployees(String name, Pageable pageable) {
-        log.info("Searching for employees with name containing: '{}'", name);
-        return employeeRepository.findByNameContainingIgnoreCase(name, pageable);
+    public Page<Employee> searchEmployees(String name, String department, EmployeeStatus status, Pageable pageable) {
+        log.info("Searching employees - Name: {}, Dept: {}, Status: {}", name, department, status);
+        
+        Specification<Employee> spec = Specification.where(EmployeeSpecification.isNotDeleted())
+                .and(EmployeeSpecification.hasDepartment(department))
+                .and(EmployeeSpecification.hasStatus(status))
+                .and((root, query, cb) -> name == null ? null : 
+                    cb.like(cb.lower(root.get("name")), "%" + name.toLowerCase() + "%"));
+                
+        return employeeRepository.findAll(spec, pageable);
     }
 
     /**
@@ -66,10 +110,10 @@ public class EmployeeService {
      * @throws ResourceNotFoundException if the employee is not found.
      */
     public Employee getEmployeeById(Long id) {
-        log.debug("Fetching employee with id: {}", id);
-        return employeeRepository.findById(id)
+        log.debug("Fetching employee with id: {} (must not be soft-deleted)", id);
+        return employeeRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> {
-                    log.error("Employee not found with id: {}", id);
+                    log.error("Active employee not found with id: {}", id);
                     return new ResourceNotFoundException("Employee not found with id: " + id);
                 });
     }
@@ -97,15 +141,24 @@ public class EmployeeService {
     }
 
     /**
-     * Deletes an employee record from the database.
+     * Performs a soft-delete on an employee record.
+     * The record is marked as deleted by setting the isDeleted flag to true,
+     * ensuring it is excluded from all future fetch and search queries.
      *
-     * @param id The ID of the employee to delete.
+     * @param id The ID of the employee to soft-delete.
      */
     public void deleteEmployee(Long id) {
-        log.info("Attempting to delete employee with id: {}", id);
+        log.info("Performing soft-delete for employee with id: {}", id);
         Employee employee = getEmployeeById(id);
-        employeeRepository.delete(employee);
-        log.info("Employee with id: {} deleted successfully", id);
+        
+        // Mark as deleted instead of removing from DB
+        employee.setDeleted(true);
+        employeeRepository.save(employee);
+        
+        // Log auditing action
+        auditLogService.logAction("DELETE_EMPLOYEE", getCurrentUsername());
+        
+        log.info("Employee with id: {} soft-deleted successfully", id);
     }
 
     /**
@@ -119,7 +172,34 @@ public class EmployeeService {
         Employee employee = getEmployeeById(id);
         employee.setStatus(EmployeeStatus.APPROVED);
         Employee approvedEmployee = employeeRepository.save(employee);
+        
+        // Log auditing action
+        auditLogService.logAction("APPROVE_EMPLOYEE", getCurrentUsername());
+        
         log.info("Employee with id: {} status updated to APPROVED", id);
         return approvedEmployee;
+    }
+
+    /**
+     * Helper method to get the currently logged-in username.
+     */
+    private String getCurrentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            return authentication.getName();
+        }
+        return "anonymousUser";
+    }
+
+    /**
+     * Helper method to check if the currently logged-in user is an admin.
+     */
+    private boolean isCurrentUserAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            return authentication.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        }
+        return false;
     }
 }

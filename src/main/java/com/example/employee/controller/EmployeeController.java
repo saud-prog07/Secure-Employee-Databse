@@ -1,19 +1,21 @@
 package com.example.employee.controller;
 
 import com.example.employee.entity.Employee;
+import com.example.employee.entity.EmployeeStatus;
 import com.example.employee.service.EmployeeService;
 import com.example.employee.dto.ApiResponse;
+import com.example.employee.dto.PaginatedResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -36,8 +38,11 @@ import java.util.Map;
 @Tag(name = "Employee", description = "The Employee Management API")
 public class EmployeeController {
 
-    @Autowired
-    private EmployeeService employeeService;
+    private final EmployeeService employeeService;
+
+    public EmployeeController(EmployeeService employeeService) {
+        this.employeeService = employeeService;
+    }
 
     /**
      * Retrieves a paginated list of all APPROVED employees.
@@ -47,10 +52,15 @@ public class EmployeeController {
      * @param sort An array specifying the sort field and direction (e.g., "id,asc").
      * @return A ResponseEntity containing an ApiResponse with a Page of Employee objects.
      */
-    @Operation(summary = "Get all approved employees", description = "Retrieves a paginated list of all employees with APPROVED status.")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully fetched approved employees")
+    @Operation(summary = "Get employees with filters", description = "Retrieves a paginated list of employees with detailed metadata (totalElements, totalPages, currentPage).")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully fetched filtered employees")
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<Employee>>> getAllEmployees(
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    public ResponseEntity<ApiResponse<PaginatedResponse<Employee>>> getAllEmployees(
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) EmployeeStatus status,
+            @RequestParam(required = false) Double minSalary,
+            @RequestParam(required = false) Double maxSalary,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id,asc") String[] sort) {
@@ -60,8 +70,10 @@ public class EmployeeController {
             ? Sort.Direction.DESC : Sort.Direction.ASC;
         
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
-        Page<Employee> employees = employeeService.getAllEmployees(pageable);
-        return ResponseEntity.ok(ApiResponse.success("Employees fetched successfully", employees));
+        Page<Employee> employeesPage = employeeService.getAllEmployees(department, status, minSalary, maxSalary, pageable);
+        
+        PaginatedResponse<Employee> response = PaginatedResponse.from(employeesPage);
+        return ResponseEntity.ok(ApiResponse.success("Employees fetched successfully", response));
     }
 
     /**
@@ -73,11 +85,14 @@ public class EmployeeController {
      * @param sort Sort parameters.
      * @return A Page of Employee objects.
      */
-    @Operation(summary = "Search employees by name", description = "Retrieves a paginated list of employees whose names contain the search string.")
+    @Operation(summary = "Search employees by name", description = "Retrieves a paginated list of employees whose names contain the search string, with metadata.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully searched employees")
     @GetMapping("/search")
-    public ResponseEntity<ApiResponse<Page<Employee>>> searchEmployees(
-            @RequestParam String name,
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    public ResponseEntity<ApiResponse<PaginatedResponse<Employee>>> searchEmployees(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) EmployeeStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id,asc") String[] sort) {
@@ -87,8 +102,10 @@ public class EmployeeController {
             ? Sort.Direction.DESC : Sort.Direction.ASC;
         
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
-        Page<Employee> employees = employeeService.searchEmployees(name, pageable);
-        return ResponseEntity.ok(ApiResponse.success("Employees searched successfully", employees));
+        Page<Employee> employeesPage = employeeService.searchEmployees(name, department, status, pageable);
+        
+        PaginatedResponse<Employee> response = PaginatedResponse.from(employeesPage);
+        return ResponseEntity.ok(ApiResponse.success("Employees searched successfully", response));
     }
 
     @Operation(summary = "Get employee by ID", description = "Retrieves a single employee record by its ID.")
@@ -97,6 +114,7 @@ public class EmployeeController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Employee not found")
     })
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
     public ResponseEntity<ApiResponse<Employee>> getEmployeeById(@PathVariable Long id) {
         Employee employee = employeeService.getEmployeeById(id);
         return ResponseEntity.ok(ApiResponse.success("Employee fetched successfully", employee));
@@ -108,6 +126,7 @@ public class EmployeeController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid input")
     })
     @PostMapping
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
     public ResponseEntity<ApiResponse<Employee>> createEmployee(@Valid @RequestBody Employee employee) {
         Employee createdEmployee = employeeService.createEmployee(employee);
         return new ResponseEntity<>(ApiResponse.success("Employee created successfully", createdEmployee), HttpStatus.CREATED);
@@ -119,6 +138,7 @@ public class EmployeeController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Employee not found")
     })
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
     public ResponseEntity<ApiResponse<Employee>> updateEmployee(@PathVariable Long id, @Valid @RequestBody Employee employeeDetails) {
         Employee updatedEmployee = employeeService.updateEmployee(id, employeeDetails);
         return ResponseEntity.ok(ApiResponse.success("Employee updated successfully", updatedEmployee));
@@ -130,6 +150,7 @@ public class EmployeeController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Employee not found")
     })
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> deleteEmployee(@PathVariable Long id) {
         employeeService.deleteEmployee(id);
         Map<String, Boolean> response = new HashMap<>();
@@ -143,6 +164,7 @@ public class EmployeeController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Employee not found")
     })
     @PutMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Employee>> approveEmployee(@PathVariable Long id) {
         Employee approvedEmployee = employeeService.approveEmployee(id);
         return ResponseEntity.ok(ApiResponse.success("Employee approved successfully", approvedEmployee));
