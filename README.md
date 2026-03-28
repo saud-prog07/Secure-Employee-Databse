@@ -4,17 +4,17 @@ A premium, enterprise-grade Spring Boot & React application for secure organizat
 
 ---
 
-## 🚀 Pro-Features & Logic
+## 🚀 Pro-Features & Governance Logic
 
 - **Premium Design System**: Fully overhauled UI with a modern Slate/Indigo theme, smooth micro-animations, and responsive layouts.
-- **Soft-Delete & Recovery**: Deleted records are logically archived. Admins can view and restore them at any time from the dashboard.
-- **Full Audit Trail**: Every sensitive action (Approvals, Deletions, Restores, Logins) is tracked in a dedicated audit log with timestamps and user attribution.
-- **Multi-Level Security**:
-    - **JWT Authentication**: Stateless token-based security.
-    - **Granular RBAC**: Specific permissions for `ADMIN` and `HR` roles.
-    - **Admin Approval Workflow**: New HR registrations and employee records can be held for admin verification.
-- **User Self-Service**: Dedicated **Profile** module for users to manage their own security credentials.
-- **Admin Command Center**: Unified **User Management** portal to oversee system access and approve HR staff.
+- **Bi-Directional Approvals**: 
+    - Admins can **Approve** or **Reject** (revert to pending) any employee record.
+    - Admins can **Approve** or **Disapprove** any HR/Administrator account.
+- **Dynamic Record Editing**: A newly implemented `Edit` suite allows HR and Admins to modify existing employee professional credentials on the fly.
+- **Soft-Delete & Archive Recovery**: Deleted records are logically archived. Admins can view and restore them at any time from the dashboard.
+- **Hard Delete (Permanent Cleanup)**: Admins can permanently remove user accounts from the database for system maintenance.
+- **Safety Overrides**: Built-in safety logic prevents Admins from accidentally deactivating or deleting their own accounts.
+- **Full Audit Trail**: Every sensitive action (Approvals, Rejections, Deletions, Restores, Logins) is tracked in a dedicated audit log with timestamps and user attribution.
 
 ---
 
@@ -41,13 +41,14 @@ The system is fully containerized for a zero-configuration setup.
    ```bash
    docker compose up -d
    ```
-   *This starts MySQL 8.0 on port **3307** to avoid local conflicts.*
+   *Starts MySQL 8.0 on port **3307** to avoid local conflicts.*
 
-2. **Run the Backend**:
+2. **Run the Backend & Auto-Seed**:
    ```bash
    mvn clean install -DskipTests
    mvn spring-boot:run
    ```
+   *Seeds default `admin`/`admin` and `hr`/`hr` accounts on first launch.*
 
 3. **Run the Frontend**:
    ```bash
@@ -55,30 +56,20 @@ The system is fully containerized for a zero-configuration setup.
    npm install
    npm start
    ```
-   *Access the UI at `http://localhost:3000` (or 3001 if port is taken).*
 
 ---
 
-## 🔐 Default Credentials
+## 📊 API Governance Summary
 
-| Username | Password | Role | Description |
+| Endpoint | Method | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `admin` | `admin` | **ADMIN** | Full system access & audit viewing |
-| `hr` | `hr` | **HR** | Standard employee management |
-
----
-
-## 📊 API Summary
-
-| Endpoint | Method | Role | Description |
-| :--- | :--- | :--- | :--- |
-| `/api/auth/register` | POST | Public | HR registration request |
-| `/api/v1/employees` | GET | Any | List approved employees |
-| `/api/v1/employees/search` | GET | Any | Advanced filtered search |
-| `/api/v1/employees/{id}/restore` | PUT | ADMIN | Recover a deleted employee |
+| `/api/auth/register` | POST | Public | New HR registration request |
+| `/api/v1/employees` | GET | Any | List authorized employees |
+| `/api/v1/employees/{id}` | PUT | Any | Edit employee professional details |
+| `/api/v1/employees/{id}/reject` | PUT | ADMIN | Revert employee approval status |
+| `/api/admin/users/{id}/disapprove` | PUT | ADMIN | Revoke system access for a user |
 | `/api/admin/audit` | GET | ADMIN | View system activity history |
-| `/api/admin/users` | GET | ADMIN | Manage and approve system users |
-| `/api/profile/password` | PUT | Any | Change your own password |
+| `/api/admin/users` | GET | ADMIN | Manage and approve system accounts |
 
 ---
 *Developed with a focus on Security, Traceability, and User Experience.*
