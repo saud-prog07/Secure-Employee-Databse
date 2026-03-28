@@ -203,6 +203,25 @@ public class EmployeeService {
     }
 
     /**
+     * Reverts an employee record back to PENDING status.
+     *
+     * @param id The ID of the employee to reject/disapprove.
+     * @return The updated Employee object with PENDING status.
+     */
+    public Employee rejectEmployee(Long id) {
+        log.info("Rejecting/Disapproving employee with id: {}", id);
+        Employee employee = getEmployeeById(id);
+        employee.setStatus(EmployeeStatus.PENDING);
+        Employee rejectedEmployee = employeeRepository.save(employee);
+        
+        // Log auditing action
+        auditLogService.logAction("REJECT_EMPLOYEE", getCurrentUsername());
+        
+        log.info("Employee with id: {} status reverted to PENDING", id);
+        return rejectedEmployee;
+    }
+
+    /**
      * Helper method to get the currently logged-in username.
      */
     private String getCurrentUsername() {

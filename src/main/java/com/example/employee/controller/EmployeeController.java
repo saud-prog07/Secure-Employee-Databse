@@ -172,6 +172,18 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.success("Employee approved successfully", approvedEmployee));
     }
 
+    @Operation(summary = "Reject an employee", description = "Sets an employee status back to PENDING. Requires ADMIN role.")
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Employee rejected"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Employee not found")
+    })
+    @PutMapping("/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Employee>> rejectEmployee(@PathVariable Long id) {
+        Employee rejectedEmployee = employeeService.rejectEmployee(id);
+        return ResponseEntity.ok(ApiResponse.success("Employee approval reverted to pending", rejectedEmployee));
+    }
+
     @Operation(summary = "Restore an employee", description = "Restores a soft-deleted employee record. Requires ADMIN role.")
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Employee restored"),

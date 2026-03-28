@@ -6,6 +6,7 @@ import AddEmployee from './pages/AddEmployee';
 import ManageUsers from './pages/ManageUsers';
 import AuditLogs from './pages/AuditLogs';
 import Profile from './pages/Profile';
+import EditEmployee from './pages/EditEmployee';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -140,6 +141,14 @@ function App() {
               element={
                 <PrivateRoute>
                   <Profile />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/edit/:id" 
+              element={
+                <PrivateRoute>
+                  <EditEmployee />
                 </PrivateRoute>
               } 
             />

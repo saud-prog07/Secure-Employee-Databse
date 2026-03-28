@@ -48,6 +48,16 @@ const Dashboard = () => {
         }
     };
 
+    const handleReject = async (id) => {
+        if (!window.confirm('Revert this employee status to PENDING?')) return;
+        try {
+            await api.put(`/api/v1/employees/${id}/reject`);
+            fetchEmployees();
+        } catch (err) {
+            alert('Rejection failed: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
     const handleRestore = async (id) => {
         try {
             await api.put(`/api/v1/employees/${id}/restore`);
@@ -85,7 +95,7 @@ const Dashboard = () => {
                     <button className="btn-primary" onClick={() => navigate('/add')}>
                         <span style={{ fontSize: '1.2rem' }}>+</span> Add Employee
                     </button>
-                    <button onClick={logout} style={{ backgroundColor: '#f1f5f9', color: '#475569' }}>
+                    <button onClick={logout} style={{ backgroundColor: '#f1f5f9', color: '#475569', fontWeight: 600 }}>
                         Logout
                     </button>
                 </div>
@@ -110,7 +120,9 @@ const Dashboard = () => {
                             <option value="IT">IT</option>
                             <option value="HR">HR</option>
                             <option value="Engineering">Engineering</option>
+                            <option value="Marketing">Marketing</option>
                             <option value="Sales">Sales</option>
+                            <option value="Finance">Finance</option>
                         </select>
                     </div>
 
@@ -151,22 +163,22 @@ const Dashboard = () => {
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 {loading ? (
                     <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                        Loading employee data...
+                        Synching server data...
                     </div>
                 ) : employees.length === 0 ? (
                     <div style={{ padding: '4rem', textAlign: 'center' }}>
-                        <h3 style={{ margin: 0 }}>No employees match your criteria</h3>
-                        <p style={{ color: 'var(--text-muted)' }}>Try adjusting your filters or search terms.</p>
+                        <h3 style={{ margin: 0 }}>No records found</h3>
+                        <p style={{ color: 'var(--text-muted)' }}>No data matches your current filtration criteria.</p>
                     </div>
                 ) : (
                     <table style={{ margin: 0 }}>
-                        <thead>
+                        <thead style={{ backgroundColor: '#f8fafc' }}>
                             <tr>
                                 <th>Name</th>
-                                <th>Email</th>
-                                <th>Department</th>
+                                <th>Identity</th>
+                                <th>Org Dept</th>
                                 <th>Salary</th>
-                                <th>Status</th>
+                                <th>Review Status</th>
                                 <th style={{ textAlign: 'right' }}>Actions</th>
                             </tr>
                         </thead>
@@ -175,7 +187,7 @@ const Dashboard = () => {
                                 <tr key={emp.id} style={{ opacity: emp.deleted ? 0.6 : 1 }}>
                                     <td>
                                         <div style={{ fontWeight: 600 }}>{emp.name}</div>
-                                        {emp.deleted && <span className="badge badge-deleted" style={{ fontSize: '0.6rem', marginTop: '0.2rem' }}>SOFT DELETED</span>}
+                                        {emp.deleted && <span className="badge" style={{ backgroundColor: '#64748b', color: 'white', fontSize: '0.6rem' }}>SOFT DELETED</span>}
                                     </td>
                                     <td>{emp.email}</td>
                                     <td>{emp.department}</td>
@@ -188,14 +200,28 @@ const Dashboard = () => {
                                     <td style={{ textAlign: 'right' }}>
                                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                                             {isAdmin && emp.deleted ? (
-                                                <button className="btn-success" onClick={() => handleRestore(emp.id)} title="Restore Employee">
+                                                <button className="btn-success" onClick={() => handleRestore(emp.id)}>
                                                     Restore
                                                 </button>
                                             ) : (
                                                 <>
+                                                    <button 
+                                                        onClick={() => navigate(`/edit/${emp.id}`)}
+                                                        style={{ backgroundColor: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer' }}
+                                                    >
+                                                        Edit
+                                                    </button>
                                                     {isAdmin && emp.status === 'PENDING' && (
                                                         <button className="btn-success" onClick={() => handleApprove(emp.id)}>
                                                             Approve
+                                                        </button>
+                                                    )}
+                                                    {isAdmin && emp.status === 'APPROVED' && (
+                                                        <button 
+                                                            onClick={() => handleReject(emp.id)}
+                                                            style={{ backgroundColor: '#fff7ed', color: '#ea580c', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer' }}
+                                                        >
+                                                            Reject
                                                         </button>
                                                     )}
                                                     {isAdmin && (
