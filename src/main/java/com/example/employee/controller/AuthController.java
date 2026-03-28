@@ -1,6 +1,7 @@
 package com.example.employee.controller;
 
 import com.example.employee.dto.ApiResponse;
+import com.example.employee.dto.JwtResponse;
 import com.example.employee.dto.LoginRequest;
 import com.example.employee.dto.RegisterRequest;
 import com.example.employee.entity.User;
@@ -10,12 +11,16 @@ import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -26,14 +31,17 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final com.example.employee.service.AuditLogService auditLogService;
+    private final com.example.employee.security.JwtUtils jwtUtils;
 
     public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder, 
                           AuthenticationManager authenticationManager,
-                          com.example.employee.service.AuditLogService auditLogService) {
+                          com.example.employee.service.AuditLogService auditLogService,
+                          com.example.employee.security.JwtUtils jwtUtils) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.auditLogService = auditLogService;
+        this.jwtUtils = jwtUtils;
     }
 
     /**
@@ -78,36 +86,15 @@ public class AuthController {
     }
 
     /**
-     * Authenticates a user based on username and password.
+     * Authenticates a user based on username and password (returns JWT token).
      *
      * @param request The login credentials.
-     * @return A ResponseEntity indicating successful login.
+     * @return A ResponseEntity with JWT token and user role information.
      */
-    @Operation(summary = "Login a user", description = "Authenticates a user with username and password.")
+    @Operation(summary = "Login a user", description = "Authenticates a user with username and password and returns a JWT token.")
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<User>> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<JwtResponse>> login(@Valid @RequestBody LoginRequest request) {
         log.info("Process: Login. Attempting user: {}", request.getUsername());
-
-        // Check for user existence
-        var userOpt = userRepository.findByUsername(request.getUsername());
-        if (userOpt.isEmpty()) {
-            log.warn("Login rejected: User '{}' not found", request.getUsername());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Invalid username or password"));
-        }
-
-        User user = userOpt.get();
-
-        if (user.isDeleted()) {
-            log.warn("Login rejected: Account '{}' is deactivated", request.getUsername());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Account has been deactivated"));
-        }
-        if (!user.isApproved()) {
-            log.warn("Login rejected: Account '{}' is pending approval", request.getUsername());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Account pending admin approval"));
-        }
 
         try {
             log.debug("Authenticating user: {}", request.getUsername());
@@ -116,13 +103,18 @@ public class AuthController {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
+            String jwt = jwtUtils.generateJwtToken(authentication);
+
+            List<String> roles = authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .collect(Collectors.toList());
+
             // Audit log the login
             auditLogService.logAction("LOGIN", request.getUsername());
 
-            // Return user details (without password)
-            user.setPassword("********");
+            JwtResponse jwtResponse = new JwtResponse(jwt, request.getUsername(), roles);
             log.info("Login successful for user: {}", request.getUsername());
-            return ResponseEntity.ok(ApiResponse.success("Login successful", user));
+            return ResponseEntity.ok(ApiResponse.success("Login successful", jwtResponse));
 
         } catch (Exception e) {
             log.warn("Login failed for user '{}': {}", request.getUsername(), e.getMessage());

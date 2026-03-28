@@ -65,16 +65,13 @@ public class EmployeeService {
      * @param pageable   Pagination information.
      * @return A Page of Employee objects.
      */
-    public Page<Employee> getAllEmployees(String department, EmployeeStatus status, Double minSalary, Double maxSalary, Pageable pageable) {
-        log.info("Fetching employees with filters - Dept: {}, Status: {}, MinSalary: {}, MaxSalary: {}", 
-                department, status, minSalary, maxSalary);
+    public Page<Employee> getAllEmployees(String department, EmployeeStatus status, Double minSalary, Double maxSalary, Boolean includeDeleted, Pageable pageable) {
+        log.info("Fetching employees with filters - Dept: {}, Status: {}, MinSalary: {}, MaxSalary: {}, IncludeDeleted: {}", 
+                department, status, minSalary, maxSalary, includeDeleted);
 
-        // Default to APPROVED if no status is specified to maintain legacy behavior
-        EmployeeStatus targetStatus = (status != null) ? status : EmployeeStatus.APPROVED;
-
-        Specification<Employee> spec = Specification.where(EmployeeSpecification.isNotDeleted())
+        Specification<Employee> spec = Specification.where(Boolean.TRUE.equals(includeDeleted) ? null : EmployeeSpecification.isNotDeleted())
                 .and(EmployeeSpecification.hasDepartment(department))
-                .and(EmployeeSpecification.hasStatus(targetStatus))
+                .and(EmployeeSpecification.hasStatus(status))
                 .and(EmployeeSpecification.hasMinSalary(minSalary))
                 .and(EmployeeSpecification.hasMaxSalary(maxSalary));
 
@@ -90,10 +87,10 @@ public class EmployeeService {
      * @param pageable   Pagination information.
      * @return A Page of matching Employee objects.
      */
-    public Page<Employee> searchEmployees(String name, String department, EmployeeStatus status, Pageable pageable) {
-        log.info("Searching employees - Name: {}, Dept: {}, Status: {}", name, department, status);
+    public Page<Employee> searchEmployees(String name, String department, EmployeeStatus status, Boolean includeDeleted, Pageable pageable) {
+        log.info("Searching employees - Name: {}, Dept: {}, Status: {}, IncludeDeleted: {}", name, department, status, includeDeleted);
         
-        Specification<Employee> spec = Specification.where(EmployeeSpecification.isNotDeleted())
+        Specification<Employee> spec = Specification.where(Boolean.TRUE.equals(includeDeleted) ? null : EmployeeSpecification.isNotDeleted())
                 .and(EmployeeSpecification.hasDepartment(department))
                 .and(EmployeeSpecification.hasStatus(status))
                 .and((root, query, cb) -> name == null ? null : 
@@ -159,6 +156,31 @@ public class EmployeeService {
         auditLogService.logAction("DELETE_EMPLOYEE", getCurrentUsername());
         
         log.info("Employee with id: {} soft-deleted successfully", id);
+    }
+
+    /**
+     * Restores a soft-deleted employee record.
+     *
+     * @param id The ID of the employee to restore.
+     * @return The restored Employee object.
+     */
+    public Employee restoreEmployee(Long id) {
+        log.info("Restoring soft-deleted employee with id: {}", id);
+        Employee employee = employeeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
+        
+        if (!employee.isDeleted()) {
+            throw new IllegalArgumentException("Employee is not deleted.");
+        }
+        
+        employee.setDeleted(false);
+        Employee restoredEmployee = employeeRepository.save(employee);
+        
+        // Log auditing action
+        auditLogService.logAction("RESTORE_EMPLOYEE", getCurrentUsername());
+        
+        log.info("Employee with id: {} restored successfully", id);
+        return restoredEmployee;
     }
 
     /**

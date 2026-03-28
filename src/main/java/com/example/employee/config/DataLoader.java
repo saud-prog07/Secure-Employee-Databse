@@ -56,7 +56,9 @@ public class DataLoader implements CommandLineRunner {
 
             // Ensure database is preserved across restarts by not dropping records indiscriminately
             ensureAdminExists();
+            ensureHrExists();
             resetAdminPassword();
+            resetHrPassword();
             seedEmployees();
         } catch (Exception e) {
             logger.error("MySQL Connection FAILED: {}", e.getMessage());
@@ -85,6 +87,14 @@ public class DataLoader implements CommandLineRunner {
         }
     }
 
+    private void resetHrPassword() {
+        String freshHash = passwordEncoder.encode("hr");
+        jdbcTemplate.update(
+            "UPDATE users SET password = ?, approved = true, deleted = false WHERE username = 'hr'",
+            freshHash
+        );
+    }
+
     private void ensureAdminExists() {
         if (userRepository.findByUsername("admin").isEmpty()) {
             logger.info("Admin user not found. Creating default admin user...");
@@ -100,6 +110,19 @@ public class DataLoader implements CommandLineRunner {
             logger.info("Successfully inserted default admin user.");
         } else {
             logger.info("Admin user already exists. Skipping insertion.");
+        }
+    }
+
+    private void ensureHrExists() {
+        if (userRepository.findByUsername("hr").isEmpty()) {
+            logger.info("HR user not found. Creating default HR user...");
+            User hr = new User();
+            hr.setUsername("hr");
+            hr.setPassword(passwordEncoder.encode("hr"));
+            hr.setRole(Role.HR);
+            hr.setApproved(true);
+            hr.setDeleted(false);
+            userRepository.save(hr);
         }
     }
 

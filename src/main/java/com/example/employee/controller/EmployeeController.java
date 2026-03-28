@@ -61,6 +61,7 @@ public class EmployeeController {
             @RequestParam(required = false) EmployeeStatus status,
             @RequestParam(required = false) Double minSalary,
             @RequestParam(required = false) Double maxSalary,
+            @RequestParam(defaultValue = "false") boolean includeDeleted,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id,asc") String[] sort) {
@@ -70,7 +71,7 @@ public class EmployeeController {
             ? Sort.Direction.DESC : Sort.Direction.ASC;
         
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
-        Page<Employee> employeesPage = employeeService.getAllEmployees(department, status, minSalary, maxSalary, pageable);
+        Page<Employee> employeesPage = employeeService.getAllEmployees(department, status, minSalary, maxSalary, includeDeleted, pageable);
         
         PaginatedResponse<Employee> response = PaginatedResponse.from(employeesPage);
         return ResponseEntity.ok(ApiResponse.success("Employees fetched successfully", response));
@@ -93,6 +94,7 @@ public class EmployeeController {
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String department,
             @RequestParam(required = false) EmployeeStatus status,
+            @RequestParam(defaultValue = "false") boolean includeDeleted,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id,asc") String[] sort) {
@@ -102,7 +104,7 @@ public class EmployeeController {
             ? Sort.Direction.DESC : Sort.Direction.ASC;
         
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
-        Page<Employee> employeesPage = employeeService.searchEmployees(name, department, status, pageable);
+        Page<Employee> employeesPage = employeeService.searchEmployees(name, department, status, includeDeleted, pageable);
         
         PaginatedResponse<Employee> response = PaginatedResponse.from(employeesPage);
         return ResponseEntity.ok(ApiResponse.success("Employees searched successfully", response));
@@ -168,5 +170,17 @@ public class EmployeeController {
     public ResponseEntity<ApiResponse<Employee>> approveEmployee(@PathVariable Long id) {
         Employee approvedEmployee = employeeService.approveEmployee(id);
         return ResponseEntity.ok(ApiResponse.success("Employee approved successfully", approvedEmployee));
+    }
+
+    @Operation(summary = "Restore an employee", description = "Restores a soft-deleted employee record. Requires ADMIN role.")
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Employee restored"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Employee not found")
+    })
+    @PutMapping("/{id}/restore")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Employee>> restoreEmployee(@PathVariable Long id) {
+        Employee restoredEmployee = employeeService.restoreEmployee(id);
+        return ResponseEntity.ok(ApiResponse.success("Employee restored successfully", restoredEmployee));
     }
 }

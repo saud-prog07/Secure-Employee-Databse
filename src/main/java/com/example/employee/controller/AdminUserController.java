@@ -22,14 +22,11 @@ public class AdminUserController {
 
     private final UserRepository userRepository;
     private final com.example.employee.service.AuditLogService auditLogService;
-    private final com.example.employee.repository.AuditLogRepository auditLogRepository;
 
     public AdminUserController(UserRepository userRepository, 
-                               com.example.employee.service.AuditLogService auditLogService,
-                               com.example.employee.repository.AuditLogRepository auditLogRepository) {
+                               com.example.employee.service.AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.auditLogService = auditLogService;
-        this.auditLogRepository = auditLogRepository;
     }
 
     /**
@@ -97,16 +94,4 @@ public class AdminUserController {
                         .body(ApiResponse.error("User not found")));
     }
 
-    /**
-     * Retrieves all audit logs in the system.
-     */
-    @Operation(summary = "List all audit logs", description = "Retrieves all system audit logs. Only accessible by ADMIN.")
-    @GetMapping("/audit")
-    public ResponseEntity<ApiResponse<java.util.List<com.example.employee.entity.AuditLog>>> getAuditLogs() {
-        log.info("Admin Request: Listing all audit logs");
-        java.util.List<com.example.employee.entity.AuditLog> logs = auditLogRepository.findAll();
-        // Sort manually or use a Sort object if preferred (simple list here)
-        logs.sort((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()));
-        return ResponseEntity.ok(ApiResponse.success("Audit logs retrieved successfully", logs));
-    }
 }
