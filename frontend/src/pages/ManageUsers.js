@@ -99,6 +99,48 @@ const ManageUsers = () => {
                 </button>
             </header>
 
+            {/* Pending Approvals Section */}
+            {!loading && users.filter(u => !u.approved && !u.deleted).length > 0 && (
+                <div className="card" style={{ marginBottom: '2rem', border: '2px solid #fbbf24', backgroundColor: '#fffbeb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                        <div style={{ fontSize: '1.5rem' }}>⚠️</div>
+                        <div>
+                            <h3 style={{ margin: '0 0 0.25rem 0', color: '#92400e' }}>Pending User Approvals</h3>
+                            <p style={{ margin: 0, color: '#b45309', fontSize: '0.9rem' }}>
+                                {users.filter(u => !u.approved && !u.deleted).length} user(s) waiting for approval
+                            </p>
+                        </div>
+                    </div>
+                    <div style={{ display: 'grid', gap: '0.75rem' }}>
+                        {users.filter(u => !u.approved && !u.deleted).map(user => (
+                            <div key={user.id} style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center',
+                                padding: '0.75rem 1rem',
+                                backgroundColor: '#fff',
+                                borderRadius: '6px',
+                                border: '1px solid #fcd34d'
+                            }}>
+                                <div>
+                                    <strong>{user.username}</strong>
+                                    <span style={{ marginLeft: '0.5rem', color: '#b45309', fontSize: '0.85rem' }}>
+                                        ({user.role})
+                                    </span>
+                                </div>
+                                <button 
+                                    onClick={() => handleApprove(user.id)} 
+                                    className="btn-primary" 
+                                    style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                                >
+                                    ✓ Approve
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {showCreateForm && (
                 <div className="card" style={{ marginBottom: '2.5rem', border: '1px solid var(--primary-light)' }}>
                     <h3 style={{ marginTop: 0 }}>Direct User Registration</h3>

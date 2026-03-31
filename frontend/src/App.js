@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import AddEmployee from './pages/AddEmployee';
 import ManageUsers from './pages/ManageUsers';
@@ -15,7 +16,7 @@ const Navbar = () => {
   const roles = JSON.parse(localStorage.getItem('roles') || '[]');
   const isAdmin = roles.includes('ROLE_ADMIN');
 
-  if (!token || location.pathname === '/') return null;
+  if (!token || location.pathname === '/' || location.pathname === '/register') return null;
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -100,6 +101,7 @@ function App() {
         <main>
           <Routes>
             <Route path="/" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route 
               path="/dashboard" 
               element={

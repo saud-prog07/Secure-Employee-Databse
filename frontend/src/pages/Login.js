@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 
 const Login = () => {
@@ -101,11 +101,29 @@ const Login = () => {
                     >
                         {loading ? 'Authenticating...' : 'Sign In'}
                     </button>
-                    
-                    <div style={{ textAlign: 'center', marginTop: '1rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                        Default credentials: <b>admin / admin</b>
-                    </div>
                 </form>
+
+                <div style={{ 
+                    marginTop: '1.5rem', 
+                    paddingTop: '1.5rem', 
+                    borderTop: '1px solid #e2e8f0',
+                    textAlign: 'center'
+                }}>
+                    <p style={{ margin: '0 0 0.75rem 0', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                        New user?
+                    </p>
+                    <Link 
+                        to="/register" 
+                        style={{ 
+                            color: 'var(--primary)', 
+                            textDecoration: 'none',
+                            fontWeight: 600,
+                            fontSize: '0.95rem'
+                        }}
+                    >
+                        Create Account
+                    </Link>
+                </div>
             </div>
         </div>
     );
