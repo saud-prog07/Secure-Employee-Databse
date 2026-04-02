@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import com.example.employee.service.QRCodeService;
+import org.springframework.http.MediaType;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -39,9 +41,11 @@ import java.util.Map;
 public class EmployeeController {
 
     private final EmployeeService employeeService;
+    private final QRCodeService qrCodeService;
 
-    public EmployeeController(EmployeeService employeeService) {
+    public EmployeeController(EmployeeService employeeService, QRCodeService qrCodeService) {
         this.employeeService = employeeService;
+        this.qrCodeService = qrCodeService;
     }
 
     /**
@@ -172,7 +176,7 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.success("Employee approved successfully", approvedEmployee));
     }
 
-    @Operation(summary = "Reject an employee", description = "Sets an employee status back to PENDING. Requires ADMIN role.")
+    @Operation(summary = "Reject an employee", description = "Sets an employee status to REJECTED. Requires ADMIN role.")
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Employee rejected"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Employee not found")
@@ -181,7 +185,38 @@ public class EmployeeController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Employee>> rejectEmployee(@PathVariable Long id) {
         Employee rejectedEmployee = employeeService.rejectEmployee(id);
-        return ResponseEntity.ok(ApiResponse.success("Employee approval reverted to pending", rejectedEmployee));
+        return ResponseEntity.ok(ApiResponse.success("Employee rejected successfully", rejectedEmployee));
+    }
+
+    @Operation(summary = "Get pending approvals", description = "Retrieves all employees with PENDING status. ADMIN only.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully fetched pending employees")
+    @GetMapping("/approvals/pending")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PaginatedResponse<Employee>>> getPendingApprovals(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "created_at,asc") String[] sort) {
+        
+        String sortField = sort[0];
+        Sort.Direction direction = (sort.length > 1 && sort[1].equalsIgnoreCase("desc")) 
+            ? Sort.Direction.DESC : Sort.Direction.ASC;
+        
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Page<Employee> pendingPage = employeeService.getPendingEmployees(pageable);
+        
+        PaginatedResponse<Employee> response = PaginatedResponse.from(pendingPage);
+        return ResponseEntity.ok(ApiResponse.success("Pending approvals fetched successfully", response));
+    }
+
+    @Operation(summary = "Get pending approvals", description = "Retrieves all employees with PENDING status. ADMIN only.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully fetched pending employees count")
+    @GetMapping("/approvals/pending/count")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Long>>> getPendingApprovalsCount() {
+        Long count = employeeService.getPendingEmployeesCount();
+        Map<String, Long> response = new HashMap<>();
+        response.put("pendingCount", count);
+        return ResponseEntity.ok(ApiResponse.success("Pending approvals count fetched successfully", response));
     }
 
     @Operation(summary = "Restore an employee", description = "Restores a soft-deleted employee record. Requires ADMIN role.")
@@ -194,5 +229,39 @@ public class EmployeeController {
     public ResponseEntity<ApiResponse<Employee>> restoreEmployee(@PathVariable Long id) {
         Employee restoredEmployee = employeeService.restoreEmployee(id);
         return ResponseEntity.ok(ApiResponse.success("Employee restored successfully", restoredEmployee));
+    }
+
+    @Operation(summary = "Generate QR code for employee", description = "Generates a QR code containing the employee ID. Returns PNG image.")
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "QR code generated successfully"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Employee not found")
+    })
+    @GetMapping("/{id}/qr")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'USER')")
+    public ResponseEntity<byte[]> generateQRCode(@PathVariable Long id) {
+        // Verify employee exists
+        employeeService.getEmployeeById(id);
+        
+        byte[] qrCode = qrCodeService.generateQRCode(id);
+        return ResponseEntity.ok()
+            .contentType(MediaType.IMAGE_PNG)
+            .body(qrCode);
+    }
+
+    @Operation(summary = "Get QR code as data URL", description = "Generates a QR code and returns it as a base64 data URL for easy embedding in HTML.")
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "QR code data URL generated successfully"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Employee not found")
+    })
+    @GetMapping("/{id}/qr/data-url")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR', 'USER')")
+    public ResponseEntity<ApiResponse<Map<String, String>>> generateQRCodeDataURL(@PathVariable Long id) {
+        // Verify employee exists
+        employeeService.getEmployeeById(id);
+        
+        String dataUrl = qrCodeService.generateQRCodeDataURL(id);
+        Map<String, String> response = new HashMap<>();
+        response.put("qrCodeUrl", dataUrl);
+        return ResponseEntity.ok(ApiResponse.success("QR code data URL generated successfully", response));
     }
 }

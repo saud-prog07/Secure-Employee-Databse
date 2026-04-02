@@ -13,6 +13,8 @@ const EditEmployee = () => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(true);
+    const [attendanceSummary, setAttendanceSummary] = useState(null);
+    const [attendanceLoading, setAttendanceLoading] = useState(false);
 
     useEffect(() => {
         const fetchEmployee = async () => {
@@ -30,7 +32,19 @@ const EditEmployee = () => {
                 setLoading(false);
             }
         };
+        const fetchAttendanceSummary = async () => {
+            setAttendanceLoading(true);
+            try {
+                const response = await api.get(`/api/attendance/summary/${id}`);
+                setAttendanceSummary(response.data.data);
+            } catch (err) {
+                console.log('Attendance summary not available');
+            } finally {
+                setAttendanceLoading(false);
+            }
+        };
         fetchEmployee();
+        fetchAttendanceSummary();
     }, [id]);
 
     const handleSubmit = async (e) => {
@@ -116,6 +130,95 @@ const EditEmployee = () => {
                     </div>
                 </form>
             </div>
+
+            {attendanceSummary && (
+                <div className="card" style={{ marginTop: '2rem' }}>
+                    <header style={{ marginBottom: '1.5rem' }}>
+                        <h2 style={{ margin: 0 }}>Attendance Analytics</h2>
+                        <p style={{ color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>Performance metrics and attendance record</p>
+                    </header>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                        <div style={{
+                            backgroundColor: '#f8fafc',
+                            padding: '1.5rem',
+                            borderRadius: '8px',
+                            textAlign: 'center',
+                            border: '2px solid #e2e8f0'
+                        }}>
+                            <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#2563eb', marginBottom: '0.5rem' }}>
+                                {attendanceSummary.attendancePercentage}%
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Attendance Rate</div>
+                            <div style={{
+                                marginTop: '0.75rem',
+                                display: 'inline-block',
+                                padding: '0.35rem 0.75rem',
+                                borderRadius: '20px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                backgroundColor: attendanceSummary.status === 'GOOD' ? '#dcfce7' : attendanceSummary.status === 'AVERAGE' ? '#fef3c7' : '#fee2e2',
+                                color: attendanceSummary.status === 'GOOD' ? '#166534' : attendanceSummary.status === 'AVERAGE' ? '#92400e' : '#991b1b'
+                            }}>
+                                {attendanceSummary.status} ({attendanceSummary.attendancePercentage >= 75 ? 'Excellent' : attendanceSummary.attendancePercentage >= 60 ? 'Satisfactory' : 'Requires Attention'})
+                            </div>
+                        </div>
+
+                        <div style={{
+                            backgroundColor: '#f8fafc',
+                            padding: '1.5rem',
+                            borderRadius: '8px',
+                            border: '2px solid #e2e8f0'
+                        }}>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '1rem',
+                                marginBottom: '1rem'
+                            }}>
+                                <div style={{ textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#16a34a', marginBottom: '0.25rem' }}>
+                                        {attendanceSummary.presentDays}
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Days Present</div>
+                                </div>
+                                <div style={{ textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: '#dc2626', marginBottom: '0.25rem' }}>
+                                        {attendanceSummary.absentDays}
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Days Absent</div>
+                                </div>
+                            </div>
+                            <div style={{
+                                backgroundColor: 'white',
+                                padding: '0.75rem',
+                                borderRadius: '6px',
+                                textAlign: 'center',
+                                fontSize: '0.9rem'
+                            }}>
+                                Total Days: <strong>{attendanceSummary.totalDays}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{
+                        marginTop: '1.5rem',
+                        backgroundColor: 'white',
+                        padding: '1rem',
+                        borderRadius: '8px',
+                        height: '12px',
+                        overflow: 'hidden'
+                    }}>
+                        <div style={{
+                            height: '100%',
+                            width: `${Math.min(attendanceSummary.attendancePercentage, 100)}%`,
+                            backgroundColor: attendanceSummary.attendancePercentage >= 75 ? '#16a34a' : attendanceSummary.attendancePercentage >= 60 ? '#f59e0b' : '#dc2626',
+                            borderRadius: '8px',
+                            transition: 'width 0.3s ease'
+                        }}></div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -48,15 +48,15 @@ const Register = () => {
                 password,
                 role: 'HR' // Default role for self-registration
             });
-            setSuccess('Registration successful! Please wait for admin approval to login.');
+            setSuccess('✓ Registration successful! A confirmation email has been sent. Please wait for admin approval to login.');
             setUsername('');
             setPassword('');
             setConfirmPassword('');
             
-            // Redirect to login after 3 seconds
+            // Redirect to login after 4 seconds
             setTimeout(() => {
                 navigate('/');
-            }, 3000);
+            }, 4000);
         } catch (err) {
             setError(err.response?.data?.message || 'Registration failed. Username may already exist.');
         } finally {

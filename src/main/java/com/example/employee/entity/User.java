@@ -34,4 +34,10 @@ public class User {
 
     @Column(nullable = false)
     private boolean deleted = false;
+
+    @Column(nullable = false)
+    private boolean twoFactorEnabled = false;
+
+    @Column(length = 255)
+    private String twoFactorSecret;
 }

@@ -2,12 +2,17 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import OtpVerification from './pages/OtpVerification';
 import Dashboard from './pages/Dashboard';
 import AddEmployee from './pages/AddEmployee';
 import ManageUsers from './pages/ManageUsers';
 import AuditLogs from './pages/AuditLogs';
 import Profile from './pages/Profile';
 import EditEmployee from './pages/EditEmployee';
+import PayrollGenerate from './pages/PayrollGenerate';
+import PayrollList from './pages/PayrollList';
+import AttendanceScan from './pages/AttendanceScan';
+import EmployeeWorkday from './pages/EmployeeWorkday';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -16,7 +21,7 @@ const Navbar = () => {
   const roles = JSON.parse(localStorage.getItem('roles') || '[]');
   const isAdmin = roles.includes('ROLE_ADMIN');
 
-  if (!token || location.pathname === '/' || location.pathname === '/register') return null;
+  if (!token || location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/verify-otp' || location.pathname === '/attendance-scan') return null;
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -60,7 +65,10 @@ const Navbar = () => {
           EMS<span style={{ color: 'var(--slate-700)' }}>.io</span>
         </div>
         <NavLink to="/dashboard">Dashboard</NavLink>
+        <NavLink to="/attendance-scan">Attendance</NavLink>
         <NavLink to="/add">Add Employee</NavLink>
+        <NavLink to="/workday" adminOnly>Employee Workday</NavLink>
+        <NavLink to="/payroll/list" adminOnly>Payroll</NavLink>
         <NavLink to="/admin/users" adminOnly>Manage Users</NavLink>
         <NavLink to="/admin/audit" adminOnly>Audit Logs</NavLink>
         <NavLink to="/profile">My Profile</NavLink>
@@ -84,13 +92,35 @@ const Navbar = () => {
 
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/" />;
+  
+  if (!token) {
+    console.warn('[PrivateRoute] No token found - redirecting to login');
+    return <Navigate to="/" replace />;
+  }
+  
+  console.log('[PrivateRoute] Token present - allowing access');
+  return children;
 };
 
 const AdminRoute = ({ children }) => {
-  const roles = JSON.parse(localStorage.getItem('roles') || '[]');
+  const token = localStorage.getItem('token');
+  const rolesStr = localStorage.getItem('roles');
+  const roles = rolesStr ? JSON.parse(rolesStr) : [];
   const isAdmin = roles.includes('ROLE_ADMIN');
-  return isAdmin ? children : <Navigate to="/dashboard" />;
+  
+  console.log('[AdminRoute] Checking admin access', { hasToken: !!token, roles, isAdmin });
+  
+  if (!token) {
+    console.warn('[AdminRoute] No token found - redirecting to login');
+    return <Navigate to="/" replace />;
+  }
+  
+  if (!isAdmin) {
+    console.warn('[AdminRoute] Not admin - redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return children;
 };
 
 function App() {
@@ -101,7 +131,10 @@ function App() {
         <main>
           <Routes>
             <Route path="/" element={<Login />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/attendance-scan" element={<AttendanceScan />} />
+            <Route path="/verify-otp" element={<OtpVerification />} />
             <Route 
               path="/dashboard" 
               element={
@@ -151,6 +184,32 @@ function App() {
               element={
                 <PrivateRoute>
                   <EditEmployee />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/payroll/list" 
+              element={
+                <PrivateRoute>
+                  <PayrollList />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/payroll/generate" 
+              element={
+                <PrivateRoute>
+                    <AdminRoute>
+                        <PayrollGenerate />
+                    </AdminRoute>
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/workday" 
+              element={
+                <PrivateRoute>
+                  <EmployeeWorkday />
                 </PrivateRoute>
               } 
             />

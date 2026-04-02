@@ -48,6 +48,30 @@ public class Employee {
     @Column(nullable = false)
     private EmployeeStatus status = EmployeeStatus.PENDING;
 
+    /**
+     * Username of the admin who approved this employee.
+     */
+    @Column(name = "approved_by")
+    private String approvedBy;
+
+    /**
+     * Timestamp when the employee was approved.
+     */
+    @Column(name = "approved_at")
+    private java.time.LocalDateTime approvedAt;
+
+    /**
+     * Two-factor authentication enabled flag.
+     */
+    @Column(name = "two_factor_enabled")
+    private Boolean twoFactorEnabled = false;
+
+    /**
+     * Two-factor authentication secret key for TOTP.
+     */
+    @Column(name = "two_factor_secret")
+    private String twoFactorSecret;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private java.time.LocalDateTime createdAt;

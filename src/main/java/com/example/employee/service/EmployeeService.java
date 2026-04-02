@@ -25,10 +25,12 @@ public class EmployeeService {
 
     private final EmployeeRepository employeeRepository;
     private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
-    public EmployeeService(EmployeeRepository employeeRepository, AuditLogService auditLogService) {
+    public EmployeeService(EmployeeRepository employeeRepository, AuditLogService auditLogService, NotificationService notificationService) {
         this.employeeRepository = employeeRepository;
         this.auditLogService = auditLogService;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -185,6 +187,7 @@ public class EmployeeService {
 
     /**
      * Approves a pending employee record.
+     * Only ADMIN can approve employees.
      *
      * @param id The ID of the employee to approve.
      * @return The updated Employee object with APPROVED status.
@@ -192,33 +195,90 @@ public class EmployeeService {
     public Employee approveEmployee(Long id) {
         log.info("Approving employee with id: {}", id);
         Employee employee = getEmployeeById(id);
+        
+        String adminUsername = getCurrentUsername();
         employee.setStatus(EmployeeStatus.APPROVED);
+        employee.setApprovedBy(adminUsername);
+        employee.setApprovedAt(java.time.LocalDateTime.now());
+        
         Employee approvedEmployee = employeeRepository.save(employee);
         
         // Log auditing action
-        auditLogService.logAction("APPROVE_EMPLOYEE", getCurrentUsername());
+        auditLogService.logAction("APPROVE_EMPLOYEE", adminUsername);
+
+        // Send approval notification
+        notificationService.sendApprovalNotification(
+                employee.getEmail(), 
+                null,  // No phone number field in Employee
+                employee.getName(),  // Use name field directly
+                adminUsername,
+                true,  // sendViaEmail
+                false  // sendViaSMS (optional)
+        );
         
-        log.info("Employee with id: {} status updated to APPROVED", id);
+        log.info("Employee with id: {} approved by: {}. Status updated to APPROVED. Notification sent.", id, adminUsername);
         return approvedEmployee;
     }
 
     /**
-     * Reverts an employee record back to PENDING status.
+     * Rejects an employee record (sets status to REJECTED).
+     * Only ADMIN can reject employees.
      *
-     * @param id The ID of the employee to reject/disapprove.
-     * @return The updated Employee object with PENDING status.
+     * @param id The ID of the employee to reject.
+     * @return The updated Employee object with REJECTED status.
      */
     public Employee rejectEmployee(Long id) {
-        log.info("Rejecting/Disapproving employee with id: {}", id);
+        log.info("Rejecting employee with id: {}", id);
         Employee employee = getEmployeeById(id);
-        employee.setStatus(EmployeeStatus.PENDING);
+        
+        String adminUsername = getCurrentUsername();
+        employee.setStatus(EmployeeStatus.REJECTED);
+        employee.setApprovedBy(adminUsername);
+        employee.setApprovedAt(java.time.LocalDateTime.now());
+        
         Employee rejectedEmployee = employeeRepository.save(employee);
         
         // Log auditing action
-        auditLogService.logAction("REJECT_EMPLOYEE", getCurrentUsername());
+        auditLogService.logAction("REJECT_EMPLOYEE", adminUsername);
+
+        // Send rejection notification
+        String rejectionReason = "Your employee record requires revision. Please contact HR for more details.";
+        notificationService.sendRejectionNotification(
+                employee.getEmail(),
+                null,  // No phone number field in Employee
+                employee.getName(),  // Use name field directly
+                rejectionReason,
+                true,  // sendViaEmail
+                false  // sendViaSMS (optional)
+        );
         
-        log.info("Employee with id: {} status reverted to PENDING", id);
+        log.info("Employee with id: {} rejected by: {}. Status updated to REJECTED. Notification sent.", id, adminUsername);
         return rejectedEmployee;
+    }
+
+    /**
+     * Retrieves all employees with PENDING status.
+     *
+     * @param pageable Pagination information.
+     * @return A Page of Employee objects with PENDING status.
+     */
+    public Page<Employee> getPendingEmployees(Pageable pageable) {
+        log.info("Fetching pending employees for approval");
+        Specification<Employee> spec = Specification.where(EmployeeSpecification.isNotDeleted())
+                .and(EmployeeSpecification.hasStatus(EmployeeStatus.PENDING));
+        return employeeRepository.findAll(spec, pageable);
+    }
+
+    /**
+     * Gets the count of all employees with PENDING status.
+     *
+     * @return Number of pending employees.
+     */
+    public long getPendingEmployeesCount() {
+        log.info("Getting count of pending employees");
+        Specification<Employee> spec = Specification.where(EmployeeSpecification.isNotDeleted())
+                .and(EmployeeSpecification.hasStatus(EmployeeStatus.PENDING));
+        return employeeRepository.count(spec);
     }
 
     /**
