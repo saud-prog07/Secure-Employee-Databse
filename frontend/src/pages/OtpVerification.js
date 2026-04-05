@@ -70,17 +70,23 @@ const OtpVerification = () => {
 
                 // Clear pending username
                 localStorage.removeItem('pendingUsername');
-                
-                // Get login mode and redirect accordingly
-                const loginMode = localStorage.getItem('loginMode') || 'admin';
                 localStorage.removeItem('loginMode');
                 
-                if (loginMode === 'employee') {
-                    console.log('[OTP Verification] Employee mode - redirecting to attendance-scan');
-                    navigate('/attendance-scan');
+                // Role-based redirection
+                const roles = response.data.data.roles || [];
+                console.log('[OTP Verification] User roles:', roles);
+                
+                // Check if user has ADMIN or HR role
+                const isAdminOrHR = roles.some(role => 
+                    role.includes('ADMIN') || role.includes('HR')
+                );
+                
+                if (isAdminOrHR) {
+                    console.log('[OTP Verification] User is ADMIN/HR - redirecting to dashboard');
+                    navigate('/dashboard', { replace: true });
                 } else {
-                    console.log('[OTP Verification] Admin mode - redirecting to dashboard');
-                    navigate('/dashboard');
+                    console.log('[OTP Verification] User is EMPLOYEE - redirecting to attendance-scan');
+                    navigate('/attendance-scan', { replace: true });
                 }
             } else {
                 console.error('[OTP Verification] Unknown response status:', response.data.data.status);

@@ -167,3 +167,31 @@ input:focus, select:focus {
     background-color: #fee2e2;
     color: var(--danger);
 }
+
+/* App Layout with Sidebar */
+.app-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    transition: margin-left 0.3s ease;
+}
+
+.main-content.with-sidebar {
+    margin-left: 70px;
+    transition: margin-left 0.3s ease;
+}
+
+.main-content.with-sidebar:hover {
+    margin-left: 70px;
+}
+
+main {
+    flex: 1;
+    padding: 2rem;
+    overflow-y: auto;
+}

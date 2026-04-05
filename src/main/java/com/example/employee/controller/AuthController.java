@@ -112,25 +112,25 @@ public class AuthController {
     @Operation(summary = "Login a user", description = "Authenticates a user with username and password. If 2FA is enabled, prompts for OTP.")
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
-        log.info("Process: Login. Attempting user: {}", request.getUsername());
+        log.info("Process: Login. Attempting user: {}", request.getIdentifier());
 
         try {
-            log.debug("Authenticating user: {}", request.getUsername());
+            log.debug("Authenticating user: {}", request.getIdentifier());
             Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
+                    new UsernamePasswordAuthenticationToken(request.getIdentifier(), request.getPassword()));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // Fetch user details
-            User user = userRepository.findByUsername(request.getUsername())
+            // Fetch user details (by username or email)
+            User user = userRepository.findByUsernameOrEmail(request.getIdentifier(), request.getIdentifier())
                     .orElseThrow(() -> new Exception("User not found"));
 
             // Check if 2FA is enabled
             if (twoFactorService.isTwoFactorEnabled(user)) {
-                log.info("2FA is enabled for user: {}", request.getUsername());
-                AuthResponse response = new AuthResponse(request.getUsername(), true);
+                log.info("2FA is enabled for user: {}", request.getIdentifier());
+                AuthResponse response = new AuthResponse(request.getIdentifier(), true);
                 // Audit log the initial login
-                auditLogService.logAction("LOGIN_AWAITING_OTP", request.getUsername());
+                auditLogService.logAction("LOGIN_AWAITING_OTP", request.getIdentifier());
                 return ResponseEntity.ok(ApiResponse.success("OTP required", response));
             }
 
@@ -142,14 +142,14 @@ public class AuthController {
                     .collect(Collectors.toList());
 
             // Audit log the successful login
-            auditLogService.logAction("LOGIN", request.getUsername());
+            auditLogService.logAction("LOGIN", request.getIdentifier());
 
-            AuthResponse authResponse = new AuthResponse(jwt, request.getUsername(), roles);
-            log.info("Login successful for user: {}", request.getUsername());
+            AuthResponse authResponse = new AuthResponse(jwt, request.getIdentifier(), roles);
+            log.info("Login successful for user: {}", request.getIdentifier());
             return ResponseEntity.ok(ApiResponse.success("Login successful", authResponse));
 
         } catch (Exception e) {
-            log.warn("Login failed for user '{}': {}", request.getUsername(), e.getMessage());
+            log.warn("Login failed for user '{}': {}", request.getIdentifier(), e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.error("Invalid username or password"));
         }
