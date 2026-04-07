@@ -4,6 +4,7 @@ import com.example.employee.entity.*;
 import com.example.employee.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,12 @@ import java.util.List;
 public class DataLoader implements CommandLineRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(DataLoader.class);
+
+    @Value("${app.init.seed-default-users:false}")
+    private boolean seedDefaultUsers;
+
+    @Value("${app.environment:development}")
+    private String appEnvironment;
 
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
@@ -38,6 +45,20 @@ public class DataLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+        logger.info("===== APPLICATION ENVIRONMENT: {} =====", appEnvironment.toUpperCase());
+        logger.info("===== DEFAULT USER SEEDING: {} =====", seedDefaultUsers ? "ENABLED" : "DISABLED");
+        
+        if (seedDefaultUsers && !"production".equalsIgnoreCase(appEnvironment)) {
+            logger.warn("");
+            logger.warn("─────────────────────────────────────────────────────────────");
+            logger.warn("⚠️  DEFAULT CREDENTIALS ARE ENABLED ON THIS INSTANCE!");
+            logger.warn("─────────────────────────────────────────────────────────────");
+            logger.warn("Default Users: admin/admin, hr/hr");
+            logger.warn("DISABLE in production by setting: app.init.seed-default-users=false");
+            logger.warn("─────────────────────────────────────────────────────────────");
+            logger.warn("");
+        }
+        
         logger.info("Verifying MySQL database connection...");
         try {
             long userCount = userRepository.count();
@@ -80,10 +101,17 @@ public class DataLoader implements CommandLineRunner {
             }
 
             // Ensure database is preserved across restarts by not dropping records indiscriminately
-            ensureAdminExists();
-            ensureHrExists();
-            resetAdminPassword();
-            resetHrPassword();
+            // Only seed default users if explicitly enabled via environment variable (NOT recommended for production)
+            if (seedDefaultUsers) {
+                logger.warn("Seeding default admin/hr users (this should only happen in development)");
+                ensureAdminExists();
+                ensureHrExists();
+                resetAdminPassword();
+                resetHrPassword();
+            } else {
+                logger.info("Default user seeding disabled. Ensure admin user exists before first run.");
+            }
+            
             seedEmployees();
             seedEmployeeUsers();
             seedAttendanceData();
