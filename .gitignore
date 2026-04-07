@@ -23,3 +23,12 @@ build/
 *.swo
 *~
 .Spring.xml
+
+# Documentation files (keep locally, not on GitHub)
+PHASE_*.md
+SECURITY_AUDIT_REPORT.md
+PROJECT_COMPLETION_SUMMARY.md
+SYSTEM_VERIFICATION_REPORT.md
+
+# Keep README.md
+!README.md
