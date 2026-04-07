@@ -23,11 +23,9 @@ const PrivateRoute = ({ children }) => {
   const token = storage.get('token');
   
   if (!token) {
-    console.warn('[PrivateRoute] No token found - redirecting to login');
     return <Navigate to="/" replace />;
   }
   
-  console.log('[PrivateRoute] Token present - allowing access');
   return children;
 };
 
@@ -41,7 +39,6 @@ function AppContent() {
   try {
     userRoles = rolesString ? JSON.parse(rolesString) : [];
   } catch (e) {
-    console.error('AppContent: Failed to parse roles:', rolesString);
     userRoles = [];
   }
   

@@ -97,8 +97,8 @@ public class DataLoader implements CommandLineRunner {
     private void resetAdminPassword() {
         // Generate fresh hash at runtime (not hardcoded) and write directly via SQL
         String freshHash = passwordEncoder.encode("admin");
-        System.out.println("===== Generated hash: " + freshHash + " =====");
-        System.out.println("===== Pre-save verify: " + passwordEncoder.matches("admin", freshHash) + " =====");
+        logger.debug("Generated hash for admin user reset");
+        logger.debug("Pre-save password verification: {}", passwordEncoder.matches("admin", freshHash));
 
         int rows = jdbcTemplate.update(
             "UPDATE users SET password = ?, approved = true, deleted = false WHERE username = 'admin'",
@@ -108,10 +108,9 @@ public class DataLoader implements CommandLineRunner {
             // Read back from DB to confirm the save
             String savedHash = jdbcTemplate.queryForObject(
                 "SELECT password FROM users WHERE username = 'admin'", String.class);
-            System.out.println("===== Saved hash in DB: " + savedHash + " =====");
-            System.out.println("===== Post-save verify: " + passwordEncoder.matches("admin", savedHash) + " =====");
+            logger.debug("Post-save password verification for admin: {}", passwordEncoder.matches("admin", savedHash));
         } else {
-            System.out.println("===== WARNING: No admin user found to reset =====");
+            logger.warn("No admin user found to reset password");
         }
     }
 

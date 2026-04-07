@@ -90,7 +90,6 @@ const Sidebar = () => {
   ];
 
   const handleLogout = () => {
-    console.log('[Sidebar] Logging out...');
     storage.clearAuth();
     navigate('/login', { replace: true });
   };

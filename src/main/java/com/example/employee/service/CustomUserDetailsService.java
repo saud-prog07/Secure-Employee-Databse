@@ -2,6 +2,8 @@ package com.example.employee.service;
 
 import com.example.employee.entity.User;
 import com.example.employee.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -13,6 +15,7 @@ import java.util.Collections;
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
 
+    private static final Logger logger = LoggerFactory.getLogger(CustomUserDetailsService.class);
     private final UserRepository userRepository;
 
     public CustomUserDetailsService(UserRepository userRepository) {
@@ -25,18 +28,14 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByUsernameOrEmail(username, username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username or email: " + username));
 
-        System.out.println("LOGIN DEBUG:");
-        System.out.println("Username: " + username);
-        System.out.println("Stored password: " + user.getPassword());
-        System.out.println("Approved: " + user.isApproved());
-        System.out.println("Deleted: " + user.isDeleted());
+        logger.debug("Login attempt for user: {}", username);
 
         if (!user.isApproved()) {
-            System.out.println("BLOCKED: User not approved");
+            logger.warn("Login blocked: User not approved - {}", username);
             throw new UsernameNotFoundException("User not approved");
         }
         if (user.isDeleted()) {
-            System.out.println("BLOCKED: User is deleted");
+            logger.warn("Login blocked: User deleted - {}", username);
             throw new UsernameNotFoundException("User deleted");
         }
 
