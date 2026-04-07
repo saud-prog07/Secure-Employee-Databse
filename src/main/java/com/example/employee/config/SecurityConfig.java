@@ -22,6 +22,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.lang.NonNull;
 import java.util.Arrays;
@@ -124,10 +125,10 @@ public class SecurityConfig {
     }
 
     /**
-     * WebMvcConfigurer for an extra layer of CORS support at the MVC level.
+     * WebMvcConfigurer for an extra layer of CORS support at the MVC level and request interceptors.
      */
     @Bean
-    public WebMvcConfigurer corsConfigurer() {
+    public WebMvcConfigurer corsConfigurer(RateLimitInterceptor rateLimitInterceptor) {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(@NonNull CorsRegistry registry) {
@@ -136,6 +137,19 @@ public class SecurityConfig {
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
+            }
+
+            @Override
+            public void addInterceptors(@NonNull InterceptorRegistry registry) {
+                // Register rate limit interceptor for all API requests
+                registry.addInterceptor(rateLimitInterceptor)
+                        .addPathPatterns("/api/**")
+                        .excludePathPatterns(
+                                "/api/health",
+                                "/api/status",
+                                "/api/swagger-ui/**",
+                                "/api/v3/api-docs/**"
+                        );
             }
         };
     }
