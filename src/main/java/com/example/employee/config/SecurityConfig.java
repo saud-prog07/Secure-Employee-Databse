@@ -76,6 +76,8 @@ public class SecurityConfig {
                                 "/api/auth/**")
                         .permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/attendance/scan").hasAnyRole("EMPLOYEE", "ADMIN", "HR")
+                        .requestMatchers("/api/attendance/status/**").hasAnyRole("EMPLOYEE", "ADMIN", "HR")
                         .anyRequest().authenticated());
 
         http.authenticationProvider(authenticationProvider());

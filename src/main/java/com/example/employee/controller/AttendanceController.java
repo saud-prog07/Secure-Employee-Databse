@@ -39,7 +39,7 @@ public class AttendanceController {
 
     @GetMapping("/status/{employeeId}")
     public ResponseEntity<ApiResponse<AttendanceResponse>> getAttendanceStatus(
-            @PathVariable Long employeeId) {
+            @PathVariable String employeeId) {
         try {
             AttendanceResponse response = attendanceService.getAttendanceStatus(employeeId);
             return ResponseEntity.ok(ApiResponse.success("Attendance status retrieved", response));

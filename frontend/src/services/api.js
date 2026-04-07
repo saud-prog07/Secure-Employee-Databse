@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { storage } from '../utils/storage';
 
 const api = axios.create({
   baseURL: 'http://localhost:8080',
@@ -6,7 +7,7 @@ const api = axios.create({
 
 // Add a request interceptor to include JWT token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = storage.get('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -29,10 +30,7 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       // Token expired or invalid
       console.warn('[API] Unauthorized (401) - Clearing token and redirecting to login');
-      localStorage.removeItem('token');
-      localStorage.removeItem('roles');
-      localStorage.removeItem('username');
-      localStorage.removeItem('pendingUsername');
+      storage.clearAuth();
       // Redirect to login page
       window.location.href = '/';
     } else if (error.response && error.response.status === 403) {

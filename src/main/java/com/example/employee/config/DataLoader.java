@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
-import java.util.ArrayList;
 
 @Component
 public class DataLoader implements CommandLineRunner {
@@ -57,6 +57,27 @@ public class DataLoader implements CommandLineRunner {
             } catch (Exception e) {
                 logger.debug("Schema cleanup: 'performed_by' already dropped or table not found.");
             }
+            try {
+                jdbcTemplate.execute("ALTER TABLE users MODIFY COLUMN role ENUM('ADMIN', 'HR', 'EMPLOYEE') NOT NULL");
+                logger.info("Schema cleanup: Updated 'role' enum in 'users' table to include EMPLOYEE.");
+            } catch (Exception e) {
+                logger.debug("Schema cleanup: Could not modify 'role' column (might already be correct or not an enum).");
+            }
+
+            // ADD PASSWORD RESET COLUMNS
+            try {
+                jdbcTemplate.execute("ALTER TABLE users ADD COLUMN reset_token VARCHAR(255)");
+                logger.info("Schema update: Added 'reset_token' column to 'users' table.");
+            } catch (Exception e) {
+                logger.debug("Schema update: 'reset_token' column already exists.");
+            }
+
+            try {
+                jdbcTemplate.execute("ALTER TABLE users ADD COLUMN reset_token_expiry DATETIME");
+                logger.info("Schema update: Added 'reset_token_expiry' column to 'users' table.");
+            } catch (Exception e) {
+                logger.debug("Schema update: 'reset_token_expiry' column already exists.");
+            }
 
             // Ensure database is preserved across restarts by not dropping records indiscriminately
             ensureAdminExists();
@@ -64,6 +85,7 @@ public class DataLoader implements CommandLineRunner {
             resetAdminPassword();
             resetHrPassword();
             seedEmployees();
+            seedEmployeeUsers();
             seedAttendanceData();
             seedPayrollData();
         } catch (Exception e) {
@@ -136,48 +158,57 @@ public class DataLoader implements CommandLineRunner {
         if (employeeRepository.count() == 0) {
             logger.info("Database is empty. Inserting comprehensive dataset of 20 professional employees...");
 
-            List<Employee> employees = List.of(
+            List<Employee> employees = Arrays.asList(
                 // Engineering Department - Senior and Mid-level Engineers
-                new Employee(null, "John Doe", "john.doe@example.com", "Engineering", 95000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
-                new Employee(null, "Emily Davis", "emily.davis@example.com", "Engineering", 92000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
-                new Employee(null, "David Taylor", "david.taylor@example.com", "Engineering", 88000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
-                new Employee(null, "Jessica Chen", "jessica.chen@example.com", "Engineering", 85000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
-                new Employee(null, "Marcus Johnson", "marcus.johnson@example.com", "Engineering", 82000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP001", "John Doe", "john.doe@example.com", "Engineering", 95000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP002", "Emily Davis", "emily.davis@example.com", "Engineering", 92000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP003", "David Taylor", "david.taylor@example.com", "Engineering", 88000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP004", "Jessica Chen", "jessica.chen@example.com", "Engineering", 85000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP005", "Marcus Johnson", "marcus.johnson@example.com", "Engineering", 82000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
                 
                 // Sales Department
-                new Employee(null, "Michael Wilson", "michael.wilson@example.com", "Sales", 78000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
-                new Employee(null, "Chris Anderson", "chris.anderson@example.com", "Sales", 75000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
-                new Employee(null, "Amanda Martinez", "amanda.martinez@example.com", "Sales", 72000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP006", "Michael Wilson", "michael.wilson@example.com", "Sales", 78000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP007", "Chris Anderson", "chris.anderson@example.com", "Sales", 75000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP008", "Amanda Martinez", "amanda.martinez@example.com", "Sales", 72000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
                 
                 // Finance Department
-                new Employee(null, "Sarah Miller", "sarah.miller@example.com", "Finance", 80000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
-                new Employee(null, "Robert Brown", "robert.brown@example.com", "Finance", 77000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
-                new Employee(null, "Patricia Lee", "patricia.lee@example.com", "Finance", 74000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP009", "Sarah Miller", "sarah.miller@example.com", "Finance", 80000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP010", "Robert Brown", "robert.brown@example.com", "Finance", 77000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP011", "Patricia Lee", "patricia.lee@example.com", "Finance", 74000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
                 
                 // Marketing Department
-                new Employee(null, "Jane Smith", "jane.smith@example.com", "Marketing", 72000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
-                new Employee(null, "Nicole Thompson", "nicole.thompson@example.com", "Marketing", 68000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP012", "Jane Smith", "jane.smith@example.com", "Marketing", 72000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP013", "Nicole Thompson", "nicole.thompson@example.com", "Marketing", 68000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
                 
                 // HR Department
-                new Employee(null, "Karen Rodriguez", "karen.rodriguez@example.com", "HR", 65000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
-                new Employee(null, "Thomas White", "thomas.white@example.com", "HR", 62000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP014", "Karen Rodriguez", "karen.rodriguez@example.com", "HR", 65000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP015", "Thomas White", "thomas.white@example.com", "HR", 62000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
                 
                 // Operations Department
-                new Employee(null, "James Garcia", "james.garcia@example.com", "Operations", 70000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
-                new Employee(null, "Lisa Jackson", "lisa.jackson@example.com", "Operations", 67000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP016", "James Garcia", "james.garcia@example.com", "Operations", 70000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP017", "Lisa Jackson", "lisa.jackson@example.com", "Operations", 67000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
                 
                 // Business Development
-                new Employee(null, "William Harris", "william.harris@example.com", "Business Development", 85000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
-                new Employee(null, "Rachel Green", "rachel.green@example.com", "Business Development", 80000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP018", "William Harris", "william.harris@example.com", "Business Development", 85000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
+                new Employee(null, "EMP019", "Rachel Green", "rachel.green@example.com", "Business Development", 80000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null),
                 
                 // Customer Support
-                new Employee(null, "Kevin White", "kevin.white@example.com", "Support", 55000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null)
+                new Employee(null, "EMP020", "Kevin White", "kevin.white@example.com", "Support", 55000.0, false, EmployeeStatus.APPROVED, null, null, false, null, null, null)
             );
 
             employeeRepository.saveAll(employees);
             logger.info("Successfully inserted {} professional employee records across 8 departments.", employees.size());
         } else {
-            logger.info("Database already contains records. Skipping sample data insertion.");
+            // Update existing employees with EMPXXX IDs if they don't have them
+            List<Employee> existing = employeeRepository.findAll();
+            for (int i = 0; i < existing.size(); i++) {
+                Employee e = existing.get(i);
+                if (e.getEmployeeId() == null) {
+                    e.setEmployeeId(String.format("EMP%03d", i + 1));
+                    employeeRepository.save(e);
+                }
+            }
+            logger.info("Updated existing employees with string IDs.");
         }
     }
 
@@ -186,7 +217,7 @@ public class DataLoader implements CommandLineRunner {
         List<Employee> employees = employeeRepository.findAll();
         if (!employees.isEmpty()) {
             logger.info("Seeding attendance data for {} employees across 2025, 2026, 2027...", employees.size());
-            LocalDate today = LocalDate.now(); // April 1, 2026
+
             
             // Define different attendance percentages for each employee to show varied performance
             double[] attendancePercentages = {0.98, 0.80, 0.64, 0.98, 0.74, 0.84, 0.40, 0.90}; // 98%, 80%, 64%, etc.
@@ -291,6 +322,35 @@ public class DataLoader implements CommandLineRunner {
                 }
             }
             logger.info("Successfully seeded payroll data.");
+        }
+    }
+
+    private void seedEmployeeUsers() {
+        List<Employee> employees = employeeRepository.findAll();
+        if (!employees.isEmpty()) {
+            logger.info("Checking and seeding user credentials for {} employees...", employees.size());
+            int createdCount = 0;
+            for (Employee employee : employees) {
+                // Generate username based on emp{id} with padding, e.g., emp001
+                String username = String.format("emp%03d", employee.getId());
+                
+                if (userRepository.findByUsername(username).isEmpty()) {
+                    User user = new User();
+                    user.setUsername(username);
+                    user.setPassword(passwordEncoder.encode("emp123")); // Default password
+                    user.setEmail(employee.getEmail());
+                    user.setRole(Role.EMPLOYEE);
+                    user.setApproved(true);
+                    user.setDeleted(false);
+                    userRepository.save(user);
+                    createdCount++;
+                }
+            }
+            if (createdCount > 0) {
+                logger.info("Successfully created {} new employee user accounts.", createdCount);
+            } else {
+                logger.info("All employee user accounts already exist.");
+            }
         }
     }
 }

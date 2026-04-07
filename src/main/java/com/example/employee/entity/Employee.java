@@ -24,6 +24,9 @@ public class Employee {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true, length = 10)
+    private String employeeId;
+
     @NotBlank(message = "Name is mandatory")
     @Column(nullable = false)
     private String name;

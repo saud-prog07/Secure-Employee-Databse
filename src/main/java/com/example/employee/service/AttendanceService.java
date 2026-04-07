@@ -30,10 +30,12 @@ public class AttendanceService {
     private AuditLogService auditLogService;
 
     public AttendanceResponse scanAttendance(AttendanceRequest request) {
-        Long employeeId = request.getEmployeeId();
+        String employeeIdStr = request.getEmployeeId();
 
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new RuntimeException("Employee not found with ID: " + employeeId));
+        Employee employee = employeeRepository.findByEmployeeId(employeeIdStr)
+                .orElseThrow(() -> new RuntimeException("Employee not found with ID: " + employeeIdStr));
+
+        Long employeeId = employee.getId();
 
         LocalDate today = LocalDate.now();
 
@@ -77,10 +79,11 @@ public class AttendanceService {
         );
     }
 
-    public AttendanceResponse getAttendanceStatus(Long employeeId) {
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new RuntimeException("Employee not found with ID: " + employeeId));
+    public AttendanceResponse getAttendanceStatus(String employeeIdStr) {
+        Employee employee = employeeRepository.findByEmployeeId(employeeIdStr)
+                .orElseThrow(() -> new RuntimeException("Employee not found with ID: " + employeeIdStr));
 
+        Long employeeId = employee.getId();
         LocalDate today = LocalDate.now();
 
         Optional<Attendance> attendance = attendanceRepository.findByEmployeeIdAndDate(employeeId, today);

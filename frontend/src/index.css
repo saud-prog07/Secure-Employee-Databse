@@ -192,6 +192,15 @@ input:focus, select:focus {
 
 main {
     flex: 1;
-    padding: 2rem;
     overflow-y: auto;
+}
+
+/* Allow full-screen pages (Login, Register, etc.) to use the whole screen without padding */
+.main-content:not(.with-sidebar) main {
+    padding: 0;
+}
+
+/* Keep padding for dashboard pages */
+.main-content.with-sidebar main {
+    padding: 2rem;
 }

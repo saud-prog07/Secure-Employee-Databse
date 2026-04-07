@@ -1,193 +1,172 @@
-﻿import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { FaUser, FaLock } from 'react-icons/fa';
 import api from '../services/api';
+import { storage } from '../utils/storage';
 import './Login.css';
 
 const Login = () => {
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(false);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
     const navigate = useNavigate();
+
+    // Helper for role-based redirection
+    const redirectByRole = useCallback((roles) => {
+        if (!roles || roles.length === 0) {
+            console.warn('[Login] No roles found for redirection');
+            setIsCheckingAuth(false);
+            return;
+        }
+
+        const cleanRoles = roles.map(role => role.toString().replace('ROLE_', '').toUpperCase());
+        console.log('[Login] Processing redirect for roles:', cleanRoles);
+        
+        if (cleanRoles.includes('ADMIN') || cleanRoles.includes('HR')) {
+            console.log('[Login] Navigating to /dashboard');
+            navigate('/dashboard', { replace: true });
+        } else if (cleanRoles.includes('EMPLOYEE')) {
+            console.log('[Login] Navigating to /attendance-scan');
+            navigate('/attendance-scan', { replace: true });
+        } else {
+            console.warn('[Login] Role not recognized, falling back to /attendance-scan');
+            navigate('/attendance-scan', { replace: true });
+        }
+    }, [navigate]);
+
+    // Check for existing session on mount
+    useEffect(() => {
+        const token = storage.get('token');
+        const rolesString = storage.get('roles');
+        
+        console.log('[Login] Checking auth on mount...', { hasToken: !!token, hasRoles: !!rolesString });
+
+        if (token && rolesString) {
+            try {
+                const roles = JSON.parse(rolesString);
+                console.log('[Login] Active session found, redirecting...');
+                redirectByRole(roles);
+                return; // Early return, don't stop the spinner
+            } catch (e) {
+                console.error('[Login] Session data corrupted:', e);
+                storage.clearAuth();
+            }
+        }
+        
+        console.log('[Login] No session found, showing login form');
+        setIsCheckingAuth(false);
+    }, [redirectByRole]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
-        
-        console.log('[Login] Attempting login with identifier:', identifier);
-        
         try {
             const response = await api.post('/api/auth/login', { identifier, password });
-            
-            console.log('[Login] Response:', response.data);
-            
-            // Validate response structure
-            if (!response.data || !response.data.data) {
-                console.error('[Login] Invalid response structure');
-                setError('Invalid server response. Please try again.');
-                return;
-            }
-            
             const responseData = response.data.data;
             
-            // Check if OTP is required (2FA enabled)
             if (responseData.status === 'OTP_REQUIRED') {
-                console.log('[Login] 2FA enabled - redirecting to OTP verification');
-                localStorage.setItem('pendingUsername', identifier);
+                storage.set('pendingUsername', identifier, rememberMe);
                 navigate('/verify-otp');
             } else if (responseData.status === 'SUCCESS') {
-                console.log('[Login] 2FA disabled - storing token');
-                console.log('[Login] Token:', responseData.token ? 'Present' : 'Missing');
-                console.log('[Login] Roles:', responseData.roles);
-                
-                if (!responseData.token) {
-                    console.error('[Login] Token missing from response');
-                    setError('Login failed: No token received. Please try again.');
-                    return;
-                }
-                
-                localStorage.setItem('token', responseData.token);
-                localStorage.setItem('roles', JSON.stringify(responseData.roles || []));
-                localStorage.setItem('username', responseData.username || email);
-                localStorage.removeItem('guestMode');
-                
-                console.log('[Login] Token stored in localStorage');
-                
-                // Role-based redirection
+                const token = responseData.token;
                 const roles = responseData.roles || [];
-                console.log('[Login] User roles:', roles);
+                const username = responseData.username || identifier;
+
+                // Save to storage (conditional based on rememberMe)
+                storage.set('token', token, rememberMe);
+                storage.set('roles', roles, rememberMe);
+                storage.set('username', username, rememberMe);
                 
-                // Check if user has ADMIN or HR role
-                const isAdminOrHR = roles.some(role => 
-                    role.includes('ADMIN') || role.includes('HR')
-                );
+                // Clear any guest flags
+                storage.remove('guestMode');
                 
-                if (isAdminOrHR) {
-                    console.log('[Login] User is ADMIN/HR - redirecting to dashboard');
-                    navigate('/dashboard', { replace: true });
-                } else {
-                    console.log('[Login] User is EMPLOYEE - redirecting to attendance-scan');
-                    navigate('/attendance-scan', { replace: true });
-                }
-            } else {
-                console.error('[Login] Unknown response status:', responseData.status);
-                setError('Unexpected server response. Please try again.');
+                redirectByRole(roles);
             }
         } catch (err) {
-            const errorMessage = err.response?.data?.message || err.message || 'Login failed - Check credentials';
-            console.error('[Login] Error:', errorMessage, err);
-            setError(errorMessage);
+            setError(err.response?.data?.message || 'Invalid credentials');
         } finally {
             setLoading(false);
         }
     };
 
-    return (
-        <div style={{ 
-            height: '100vh', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)' 
-        }}>
-            <div className="card" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem' }}>
-                {/* Logo and Title */}
-                <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-                    <div style={{ 
-                        width: '60px', 
-                        height: '60px', 
-                        backgroundColor: 'var(--primary)', 
-                        borderRadius: '12px', 
-                        margin: '0 auto 1rem auto',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.4)',
-                        fontSize: '1.8rem'
-                    }}>
-                        ðŸ¢
-                    </div>
-                    <h1 style={{ margin: '0 0 0.5rem 0', fontSize: '1.75rem', color: 'var(--text-primary)' }}>
-                        EMS.io
-                    </h1>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: 0 }}>
-                        Employee Management System
-                    </p>
+    if (isCheckingAuth) {
+        return (
+            <div className="login-bg-container">
+                <div className="login-glass-card">
+                    <div className="loading-spinner"></div>
+                    <p style={{ color: 'white', marginTop: '20px' }}>Checking session...</p>
                 </div>
+            </div>
+        );
+    }
 
-                {/* Login Form */}
-                <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    {/* Email/Username Input */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                            Email or Username
-                        </label>
+    return (
+        <div className="login-bg-container">
+            <div className="login-glass-card">
+                <h1 className="login-title">Login</h1>
+                
+                <form onSubmit={handleLogin} className="login-form-content">
+                    <div className="input-pill-container">
                         <input 
                             type="text" 
-                            placeholder="admin or emp001" 
+                            placeholder="Username" 
                             value={identifier} 
                             onChange={(e) => setIdentifier(e.target.value)}
                             required
-                            autoFocus
-                            style={{ width: '100%' }}
                         />
+                        <FaUser className="pill-icon" />
                     </div>
                     
-                    {/* Password Input */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                            Password
-                        </label>
+                    <div className="input-pill-container">
                         <input 
                             type="password" 
-                            placeholder="Enter your password" 
+                            placeholder="Password" 
                             value={password} 
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            style={{ width: '100%' }}
                         />
+                        <FaLock className="pill-icon" />
                     </div>
 
-                    {/* Error Message */}
+                    <div className="login-options-row">
+                        <div className="remember-me-group">
+                            <input 
+                                type="checkbox" 
+                                id="remember" 
+                                checked={rememberMe}
+                                onChange={(e) => setRememberMe(e.target.checked)}
+                            /> 
+                            <label htmlFor="remember">Remember me</label>
+                        </div>
+                        <Link to="/forgot-password" value="Forgot password?" className="forgot-link">Forgot password?</Link>
+                    </div>
+                    
+                    <button 
+                        className="login-pill-button" 
+                        type="submit" 
+                        disabled={loading}
+                    >
+                        {loading ? 'Please wait...' : 'Login'}
+                    </button>
+                    
+                    <div className="register-footer">
+                        Don't have an account? <Link to="/register">Register</Link>
+                    </div>
+
                     {error && (
-                        <div style={{ 
-                            fontSize: '0.875rem', 
-                            color: 'var(--danger)', 
-                            backgroundColor: '#fee2e2', 
-                            padding: '0.75rem', 
-                            borderRadius: '8px',
-                            textAlign: 'center'
-                        }}>
+                        <div className="status-error-msg">
                             {error}
                         </div>
                     )}
-
-                    {/* Sign In Button */}
-                    <button 
-                        className="btn-primary" 
-                        type="submit" 
-                        disabled={loading}
-                        style={{ width: '100%', justifyContent: 'center', padding: '0.875rem', marginTop: '0.5rem' }}
-                    >
-                        {loading ? 'Signing in...' : 'Sign In'}
-                    </button>
                 </form>
 
-                {/* Demo Credentials Info */}
-                <div style={{
-                    marginTop: '1.5rem',
-                    padding: '1rem',
-                    backgroundColor: '#f0f9ff',
-                    borderRadius: '8px',
-                    border: '1px solid #bae6fd',
-                    fontSize: '0.8rem',
-                    color: '#0369a1',
-                    textAlign: 'center'
-                }}>
-                    <strong>Demo Credentials:</strong><br/>
-                    <code>admin</code> / <code>password123</code> (Admin/HR)<br/>
-                    <code>emp001</code> / <code>emp123</code> (Employee)
+                {/* Subtle Demo Info */}
+                <div className="mini-demo-hint">
+                    admin/password123 | emp001/emp123
                 </div>
             </div>
         </div>

@@ -43,4 +43,9 @@ public class User {
 
     @Column(length = 255)
     private String twoFactorSecret;
+
+    @Column(length = 255)
+    private String resetToken;
+
+    private java.time.LocalDateTime resetTokenExpiry;
 }

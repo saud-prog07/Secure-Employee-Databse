@@ -1,13 +1,22 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
+import { storage } from '../utils/storage';
 
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-  const token = localStorage.getItem('token');
-  const rolesString = localStorage.getItem('roles');
-  const roles = rolesString ? JSON.parse(rolesString) : [];
+  const token = storage.get('token');
+  const rolesString = storage.get('roles');
+  let roles = [];
+  try {
+    roles = rolesString ? JSON.parse(rolesString) : [];
+  } catch (e) {
+    console.error('ProtectedRoute: Failed to parse roles:', rolesString);
+    roles = [];
+  }
 
-  // Convert roles to clean format (remove ROLE_ prefix)
-  const cleanRoles = roles.map(role => role.replace('ROLE_', ''));
+  // Convert roles to clean format (remove ROLE_ prefix and uppercase for safety)
+  const cleanRoles = roles.map(role => role.toString().replace('ROLE_', '').toUpperCase());
+
+  console.log('[AuthCheck] Path:', window.location.pathname, '| Roles:', cleanRoles, '| Token:', !!token);
 
   // Check if user is authenticated
   if (!token) {

@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { storage } from '../utils/storage';
 import {
   FaTachometerAlt,
   FaUsers,
@@ -18,20 +19,24 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const username = localStorage.getItem('username') || 'User';
+  const username = storage.get('username') || 'User';
   
-  // Parse roles from localStorage
-  const rolesString = localStorage.getItem('roles');
-  let userRoles = [];
-  try {
-    userRoles = rolesString ? JSON.parse(rolesString) : [];
-  } catch (e) {
-    console.error('Error parsing roles:', e);
-    userRoles = [];
-  }
+  // Parse roles from storage
+  const rolesString = storage.get('roles');
+  const userRoles = useMemo(() => {
+    try {
+      return rolesString ? JSON.parse(rolesString) : [];
+    } catch (e) {
+      console.error('Error parsing roles:', e);
+      return [];
+    }
+  }, [rolesString]);
   
   // Convert backend role format (ROLE_ADMIN) to simple format (ADMIN)
-  const simplifiedRoles = userRoles.map(role => role.replace('ROLE_', ''));
+  const simplifiedRoles = useMemo(() => 
+    userRoles.map(role => role.toString().replace('ROLE_', '').toUpperCase()), 
+    [userRoles]
+  );
 
   const menuItems = [
     {
@@ -85,9 +90,8 @@ const Sidebar = () => {
   ];
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('roles');
-    localStorage.removeItem('username');
+    console.log('[Sidebar] Logging out...');
+    storage.clearAuth();
     navigate('/login', { replace: true });
   };
 
@@ -101,11 +105,11 @@ const Sidebar = () => {
     return location.pathname === itemPath || location.pathname.startsWith(itemPath + '/');
   };
 
-  const canAccessItem = (roles) => {
-    if (!roles || roles.length === 0) return true;
+  const canAccessItem = (itemRoles) => {
+    if (!itemRoles || itemRoles.length === 0) return true;
     
     // Check if user has any of the required roles
-    return roles.some(requiredRole => {
+    return itemRoles.some(requiredRole => {
       return simplifiedRoles.includes(requiredRole);
     });
   };

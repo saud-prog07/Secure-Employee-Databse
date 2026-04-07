@@ -1,6 +1,5 @@
 package com.example.employee.service;
 
-import com.example.employee.entity.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
